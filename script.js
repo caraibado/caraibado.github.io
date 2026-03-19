@@ -69,15 +69,26 @@ const maxAge = 40; // Tempo que o rastro demora para sumir (quanto maior, mais l
 
 // Ajusta o tamanho do canvas para o tamanho da tela
 function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // Captura o movimento do mouse
 window.addEventListener('mousemove', (e) => {
-    points.push({ x: e.clientX, y: e.clientY, age: 0 });
+    const rect = canvas.getBoundingClientRect();
+
+    points.push({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        age: 0
+    });
 });
 
 // Função de desenho contínuo
@@ -125,6 +136,7 @@ workBtn.addEventListener('click', function(event) {
     if (window.innerWidth <= 768) {
         event.preventDefault(); 
         dropdownMenu.classList.toggle('mostrar-no-celular');
+        setTimeout(resizeCanvas, 50);
     }
 });
 
@@ -140,6 +152,7 @@ linksDropdown.forEach(link => {
         const targetSection = document.getElementById(targetId);
         if (targetSection) {
             targetSection.classList.add('ativo');
+            animarTitulo(targetSection);
             targetSection.scrollIntoView({
                 behavior: "smooth",
                 block: "start"
@@ -148,6 +161,7 @@ linksDropdown.forEach(link => {
 
         // FECHA O DROPDOWN garantido
         dropdownMenu.classList.remove("mostrar-no-celular");
+        setTimeout(resizeCanvas, 50);
     });
 });
 
@@ -155,6 +169,7 @@ linksDropdown.forEach(link => {
 document.addEventListener('click', function(event) {
     if (!workBtn.contains(event.target) && !dropdownMenu.contains(event.target)) {
         dropdownMenu.classList.remove('mostrar-no-celular');
+        setTimeout(resizeCanvas, 50);
     }
 });
 
@@ -180,3 +195,101 @@ emailSpan.addEventListener('click', function() {
             console.error('Erro ao copiar o texto: ', err);
      });
 });
+
+document.querySelectorAll('.video-wrapper').forEach(wrapper => {
+
+    const iframe = wrapper.querySelector('iframe');
+    const playBtn = wrapper.querySelector('.play-btn');
+    const muteBtn = wrapper.querySelector('.mute-btn');
+
+    let isPlaying = true;
+    let isMuted = true;
+
+    playBtn.addEventListener('click', () => {
+        if (isPlaying) {
+            iframe.contentWindow.postMessage(
+                '{"event":"command","func":"pauseVideo","args":""}', '*'
+            );
+            playBtn.textContent = '▶';
+        } else {
+            iframe.contentWindow.postMessage(
+                '{"event":"command","func":"playVideo","args":""}', '*'
+            );
+            playBtn.textContent = '⏸';
+        }
+        isPlaying = !isPlaying;
+    });
+
+    muteBtn.addEventListener('click', () => {
+        if (isMuted) {
+            iframe.contentWindow.postMessage(
+                '{"event":"command","func":"unMute","args":""}', '*'
+            );
+            muteBtn.textContent = '🔊';
+        } else {
+            iframe.contentWindow.postMessage(
+                '{"event":"command","func":"mute","args":""}', '*'
+            );
+            muteBtn.textContent = '🔇';
+        }
+        isMuted = !isMuted;
+    });
+
+});
+
+// --- 5. FILTRO DE CATEGORIAS ---
+document.querySelectorAll('.portfolio-section').forEach(section => {
+
+    const categories = section.querySelectorAll('.category');
+    const videos = section.querySelectorAll('.video-wrapper');
+
+    categories.forEach(btn => {
+        btn.addEventListener('click', () => {
+
+            // ativa botão só da seção
+            categories.forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+
+            const filter = btn.dataset.filter;
+
+            videos.forEach(video => {
+                if (filter === 'all' || video.dataset.category === filter) {
+                    video.style.display = 'flex';
+                } else {
+                    video.style.display = 'none';
+                }
+            });
+
+        });
+    });
+
+});
+
+const titles = document.querySelectorAll('.section-title');
+
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('show');
+        }
+    });
+}, {
+    threshold: 0.3
+});
+
+titles.forEach(title => observer.observe(title));
+
+function animarTitulo(secao) {
+    const titulo = secao.querySelector('.section-title');
+
+    if (!titulo) return;
+
+    // remove animação
+    titulo.classList.remove('animate');
+
+    // força o reset (hack necessário)
+    void titulo.offsetWidth;
+
+    // adiciona novamente
+    titulo.classList.add('animate');
+}
